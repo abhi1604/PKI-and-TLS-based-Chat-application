@@ -1,0 +1,32 @@
+{
+  "signing": {
+    "profiles":{
+      "CA":{
+        "auth_key": "key1",
+        "usages": ["signing"],
+        "expiry": "720h",
+        "is_ca": true
+      },
+      "email":{
+        "usages": ["s/mime"],
+        "expiry": "720h"
+      }
+    },
+  "default": {
+      "auth_key": "key1",
+      "expiry": "8760h",
+      "usages": [
+         "signing",
+         "key encipherment",
+         "server auth"
+       ],
+      "is_ca": true
+     }
+  },
+  "auth_keys": {
+    "key1": {
+      "key": "c27e9f636bbcdf49d21870bab55e4f6d" ,
+      "type": "standard"
+    }
+  }
+}

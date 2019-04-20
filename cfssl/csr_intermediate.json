@@ -1,0 +1,20 @@
+{
+  "CN": "CSE Intermediate CA",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "IN",
+      "L": "Hyderabad",
+      "O": "IITH",
+      "OU": "CSE INTERMEDIATE CA",
+      "ST": "Telangana",
+      "EMAIL": "rootca@cse.iith.ac.in"
+    }
+  ],
+  "hosts": [
+      "cse.iith.ac.in"
+  ]
+}

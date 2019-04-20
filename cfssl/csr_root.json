@@ -1,0 +1,17 @@
+{
+  "CN": "IITH Root CA",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "IN",
+      "L": "Hyderabad",
+      "O": "IITH",
+      "OU": "IITH ROOT CA",
+      "ST": "Telangana",
+      "EMAIL": "rootca@iith.ac.in"
+    }
+  ]
+}
