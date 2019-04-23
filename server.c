@@ -15,6 +15,7 @@
 #define BUFSIZE 128
 
 int main(int argc, char*argv[]) {
+    X509 *cert = NULL;
     static char buffer[BUFSIZE];
     struct sockaddr_in sin;
     socklen_t sin_len;
@@ -39,7 +40,7 @@ int main(int argc, char*argv[]) {
 
     SSL_library_init();
 
-    method = SSLv23_server_method();
+    method = TLS_server_method();
     
     if(!method) {
         fprintf(stderr, "Cannot create TLS_server_method\n");
@@ -162,9 +163,25 @@ int main(int argc, char*argv[]) {
             continue;
         }
 
+
         /* Print success connection message on the server */
         printf("SSL handshake successful with %s:%d\n", inet_ntoa(sin.sin_addr),
             ntohs(sin.sin_port));
+
+        cert = SSL_get_peer_certificate(ssl); /* get the server's certificate */
+        if (cert != NULL)
+        {
+            printf("Server certificates:\n");
+            char *line;
+            line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
+            printf("Subject: %s\n", line);
+            free(line); /* free the malloc'ed string */
+            line = X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0);
+            printf("Issuer: %s\n", line);
+            free(line);      /* free the malloc'ed string */
+            X509_free(cert); /* free the malloc'ed certificate copy */
+        }
+
 
         /* Echo server... */
         if ((len = SSL_read(ssl, buffer, BUFSIZE)) != 0) {

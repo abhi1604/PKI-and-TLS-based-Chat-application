@@ -12,17 +12,12 @@
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
-typedef enum {
-        MatchFound,
-        MatchNotFound,
-        NoSANPresent,
-        MalformedCertificate,
-        Error
-} HostnameValidationResult;
 
 #define BUFSIZE 128
 
-static HostnameValidationResult matches_common_name(const char *hostname, const X509 *server_cert) {
+
+
+int matches_common_name(const char *host_ip, const X509 *server_cert) {
         int common_name_loc = -1;
         X509_NAME_ENTRY *common_name_entry = NULL;
         ASN1_STRING *common_name_asn1 = NULL;
@@ -31,37 +26,37 @@ static HostnameValidationResult matches_common_name(const char *hostname, const 
         // Find the position of the CN field in the Subject field of the certificate
         common_name_loc = X509_NAME_get_index_by_NID(X509_get_subject_name((X509 *) server_cert), NID_commonName, -1);
         if (common_name_loc < 0) {
-                return Error;
+                return -1;
         }
 
         // Extract the CN field
         common_name_entry = X509_NAME_get_entry(X509_get_subject_name((X509 *) server_cert), common_name_loc);
         if (common_name_entry == NULL) {
-                return Error;
+                return -1;
         }
 
         // Convert the CN field to a C string
         common_name_asn1 = X509_NAME_ENTRY_get_data(common_name_entry);
         if (common_name_asn1 == NULL) {
-                return Error;
+                return -1;
         }
         common_name_str = (char *) ASN1_STRING_get0_data(common_name_asn1);
 
         // Make sure there isn't an embedded NUL character in the CN
         if ((size_t)ASN1_STRING_length(common_name_asn1) != strlen(common_name_str)) {
-                return MalformedCertificate;
+                return -1;
         }
 
-        if( strcmp(hostname, common_name_str) == 0) {
-           return MatchFound;
+        if( strcmp(host_ip, common_name_str) == 0) {
+           return 1;
         }
 
-        return MatchNotFound;
+        return -1;
 }
 
 
-static HostnameValidationResult matches_subject_alternative_name(const char *hostname, const X509 *server_cert) {
-        HostnameValidationResult result = MatchNotFound;
+int matches_subject_alternative_name(const char *host_ip, const X509 *server_cert) {
+        int result = -1;
         int i;
         int san_names_nb = -1;
         STACK_OF(GENERAL_NAME) *san_names = NULL;
@@ -69,9 +64,9 @@ static HostnameValidationResult matches_subject_alternative_name(const char *hos
         // Try to extract the names within the SAN extension from the certificate
         san_names = X509_get_ext_d2i((X509 *) server_cert, NID_subject_alt_name, NULL, NULL);
         if (san_names == NULL) {
-                return NoSANPresent;
+                return -1;
         }
-        san_names_nb = sk_GENERAL_NAME_num(san_names);
+        san_names_nb = sk_GENERAL_NAME_num(san_names); // Get number of SAN names
 
         // Check each name within the extension
         for (i=0; i<san_names_nb; i++) {
@@ -83,12 +78,12 @@ static HostnameValidationResult matches_subject_alternative_name(const char *hos
 
                         // Make sure there isn't an embedded NUL character in the DNS name
                         if ((size_t)ASN1_STRING_length(current_name->d.dNSName) != strlen(dns_name)) {
-                                result = MalformedCertificate;
+                                result = -1;
                                 break;
                         }
-                        else { // Compare expected hostname with the DNS name
-                                if( strcmp(dns_name, hostname) == 0) {
-                                    return MatchFound;
+                        else { // Compare expected host_ip with the DNS name
+                                if( strcmp(dns_name, host_ip) == 0) {
+                                    return 1;
                                 }
                         }
                 }
@@ -108,24 +103,19 @@ int main(int argc, char*argv[]) {
     SSL *ssl;
     int server = 0;
     
-    char *dest_url 
-                   = "https://localhost:5002";
-                // = argv[1];
-    const char *hostName = 
-    "127.0.0.1";
-    // "localhost";
-    int port = 5002;
-    if(argc!=5) {
-        fprintf(stdout, "%s ip:port ca.pem cert.pem key.pem\n", argv[0]);
+    if(argc!=6) {
+        fprintf(stdout, "%s ip port ca.pem cert.pem key.pem\n", argv[0]);
         return -1;
     }
-    const char *ca_pem = argv[2];
-    const char *cert_pem = argv[3];
-    const char *key_pem = argv[4];
+    const char *host_ip = argv[1];
+    int port = atoi(argv[2]);
+    const char *ca_pem = argv[3];
+    const char *cert_pem = argv[4];
+    const char *key_pem = argv[5];
 
     SSL_library_init();
 
-    method = SSLv23_client_method();
+    method = TLS_client_method();
     
     if(!method) {
         fprintf(stderr, "Cannot create TLS_client_method\n");
@@ -184,21 +174,21 @@ int main(int argc, char*argv[]) {
     struct hostent *host;
     struct sockaddr_in addr;
 
-    if ((host = gethostbyname(hostName)) == NULL)
+    if ((host = gethostbyname(host_ip)) == NULL)
     {
-        perror(hostName);
+        perror(host_ip);
         return -1;
     }
     server = socket(PF_INET, SOCK_STREAM, 0);
     bzero(&addr, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sin_addr.s_addr = inet_addr(host_ip);
     int tt = sizeof(addr);
 
     if (connect(server, (struct sockaddr *)&addr, (socklen_t)tt) != 0) {
         close(server);
-        perror(hostName);
+        perror(host_ip);
         fprintf(stdout, "cannot create COnnection to server\n");
         return -1;
     }
@@ -210,23 +200,23 @@ int main(int argc, char*argv[]) {
     SSL_set_fd(ssl, server);
 
     if (SSL_connect(ssl) != 1)
-        fprintf(stderr, "Error: Could not build a SSL session to: %s.\n", dest_url);
+        fprintf(stderr, "Error: Could not build a SSL session to: %s:%d.\n", host_ip, port);
     else
-        fprintf(stdout, "Successfully enabled SSL/TLS session to: %s.\n", dest_url);
+        fprintf(stdout, "Successfully enabled SSL/TLS session to: %s:%d.\n", host_ip, port);
     char *line;
     cert = SSL_get_peer_certificate(ssl); /* get the server's certificate */
     if (cert != NULL)
     {
-        if(matches_common_name(hostName, cert) != MatchFound) {
-            if(!matches_subject_alternative_name(hostName, cert)) {
-                fprintf(stderr, "CN/SAN does not matches hostname\n");  
+        if(matches_common_name(host_ip, cert) != 1) {
+            if(matches_subject_alternative_name(host_ip, cert) != 1) {
+                fprintf(stderr, "CN/SAN does not matches host_ip\n");  
                 SSL_free(ssl);
                 close(server);
                 SSL_CTX_free(ctx);
                 return 1;  
             }
         }
-        fprintf(stdout, "CN and hostname matches\n");  
+        fprintf(stdout, "CN and host_ip matches\n");  
         printf("Server certificates:\n");
         line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
         printf("Subject: %s\n", line);
