@@ -15,6 +15,17 @@
 #define BUFSIZE 128
 
 int main(int argc, char*argv[]) {
+
+    if(argc!=5) {
+        fprintf(stdout, "%s port ca.pem cert.pem key.pem\n", argv[0]);
+        return -1;
+    }
+
+    const char *ca_pem = argv[2];
+    const char *cert_pem = argv[3];
+    const char *key_pem = argv[4];
+
+
     X509 *cert = NULL;
     static char buffer[BUFSIZE];
     struct sockaddr_in sin;
@@ -30,13 +41,8 @@ int main(int argc, char*argv[]) {
     int server = 0;
     
     int port_num = 5002;
-    if(argc!=5) {
-        fprintf(stdout, "%s port ca.pem cert.pem key.pem\n", argv[0]);
-        return -1;
-    }
-    const char *ca_pem = argv[2];
-    const char *cert_pem = argv[3];
-    const char *key_pem = argv[4];
+    
+
 
     SSL_library_init();
 

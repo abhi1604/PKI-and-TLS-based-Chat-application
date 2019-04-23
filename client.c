@@ -97,22 +97,24 @@ int matches_subject_alternative_name(const char *host_ip, const X509 *server_cer
 
 
 int main(int argc, char*argv[]) {
-    X509 *cert = NULL;
-    const SSL_METHOD *method;
-    SSL_CTX *ctx;
-    SSL *ssl;
-    int server = 0;
-    
+
     if(argc!=6) {
         fprintf(stdout, "%s ip port ca.pem cert.pem key.pem\n", argv[0]);
         return -1;
     }
+    
     const char *host_ip = argv[1];
     int port = atoi(argv[2]);
     const char *ca_pem = argv[3];
     const char *cert_pem = argv[4];
     const char *key_pem = argv[5];
 
+    X509 *cert = NULL;
+    const SSL_METHOD *method;
+    SSL_CTX *ctx;
+    SSL *ssl;
+    int server = 0;
+    
     SSL_library_init();
 
     method = TLS_client_method();
