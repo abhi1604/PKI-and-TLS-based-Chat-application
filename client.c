@@ -11,7 +11,7 @@
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
-
+#define BUFSIZE 128
 int main(int argc, char*argv[]) {
     X509 *cert = NULL;
     const SSL_METHOD *method;
@@ -139,6 +139,21 @@ int main(int argc, char*argv[]) {
     }
     char *msg = "Hi, I am client";
     SSL_write(ssl, msg, strlen(msg));
+
+
+
+    static char buffer[BUFSIZE];
+    int len;
+    len = SSL_read(ssl, buffer, BUFSIZE);
+    if (len > 0) {
+        fprintf(stderr, " Got Message from server: %s\n", buffer);
+    } else {   
+        fprintf(stderr, "SSL read on socket failed\n");
+    }
+        
+
+
+
     SSL_free(ssl);
     close(server);
     SSL_CTX_free(ctx);

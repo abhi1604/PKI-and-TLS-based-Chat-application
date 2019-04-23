@@ -167,35 +167,28 @@ int main(int argc, char*argv[]) {
             ntohs(sin.sin_port));
 
         /* Echo server... */
-        while ((len = SSL_read(ssl, buffer, BUFSIZE)) != 0) {
+        if ((len = SSL_read(ssl, buffer, BUFSIZE)) != 0) {
             if (len < 0) {
                 fprintf(stderr, "SSL read on socket failed\n");
-                break;
-            } else if ((rc = SSL_write(ssl, buffer, len)) != len) {
-
-                break;
+            } else {
+                fprintf(stderr, " Got Message from Client: %s\n", buffer);
             }
         }
+        
+        const char* reply="Server Sent it's regards\n\n";
 
         /* Echo write */
-        if ((rc = SSL_write(ssl, buffer, len)) != len) {
-            if (rc < 0) {
-                fprintf(stderr, "SSL write on socket failed\n");
-                SSL_shutdown(ssl);
-            }
-            SSL_free(ssl);
-            continue;
+        rc = SSL_write(ssl, reply, strlen(reply));
+        if (rc <= 0) {
+            fprintf(stderr, "SSL write on socket failed\n");
         }
-
-        /* Successfully echoed, print on our screen as well */
-        printf("%s", buffer);
-
-        /* Cleanup the SSL handle */
+        else {
+            fprintf(stderr, "Reply Sent: %s\n",reply);
+        }
         SSL_shutdown(ssl);
-        SSL_free(ssl);
+        SSL_free(ssl);   
     }
 
-    printf("REACHED HERE....\n");
     close(server);
     SSL_CTX_free(ctx);
     return 0;
