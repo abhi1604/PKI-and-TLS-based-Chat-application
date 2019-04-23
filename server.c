@@ -28,7 +28,7 @@ int main(int argc, char*argv[]) {
     const SSL_METHOD *method;
     int server = 0;
     
-    int port_num = 50002;
+    int port_num = 5002;
     if(argc!=5) {
         fprintf(stdout, "%s port ca.pem cert.pem key.pem\n", argv[0]);
         return -1;
@@ -133,11 +133,7 @@ int main(int argc, char*argv[]) {
         return -1;
     }
 
-
-
-
-
-     /* Get to work */
+    /* Get to work */
     while (1) {
         /* Hold on till we can an incoming connection */
         sin_len = sizeof(sin);
@@ -179,16 +175,6 @@ int main(int argc, char*argv[]) {
 
                 break;
             }
-        }
-
-        /* Echo read */
-        if ((len = SSL_read(ssl, buffer, BUFSIZE)) < 0) {
-            if (len < 0) {
-                fprintf(stderr, "SSL read on socket failed\n");
-                SSL_shutdown(ssl);
-            }
-            SSL_free(ssl);
-            continue;
         }
 
         /* Echo write */

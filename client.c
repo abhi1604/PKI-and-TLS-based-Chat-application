@@ -20,12 +20,12 @@ int main(int argc, char*argv[]) {
     int server = 0;
     
     char *dest_url 
-                   = "https://localhost:50002";
+                   = "https://localhost:5002";
                 // = argv[1];
-    const char *hostname = 
-    // "127.0.0.1";
-    "localhost";
-    int port = 50002;
+    const char *hostName = 
+    "127.0.0.1";
+    // "localhost";
+    int port = 5002;
     if(argc!=5) {
         fprintf(stdout, "%s ip:port ca.pem cert.pem key.pem\n", argv[0]);
         return -1;
@@ -33,6 +33,7 @@ int main(int argc, char*argv[]) {
     const char *ca_pem = argv[2];
     const char *cert_pem = argv[3];
     const char *key_pem = argv[4];
+
     SSL_library_init();
 
     method = SSLv23_client_method();
@@ -94,29 +95,27 @@ int main(int argc, char*argv[]) {
     struct hostent *host;
     struct sockaddr_in addr;
 
-    if ((host = gethostbyname(hostname)) == NULL)
+    if ((host = gethostbyname(hostName)) == NULL)
     {
-        perror(hostname);
+        perror(hostName);
         return -1;
     }
     server = socket(PF_INET, SOCK_STREAM, 0);
     bzero(&addr, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = *(long *)(host->h_addr);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     int tt = sizeof(addr);
-    if (connect(server, (struct sockaddr *)&addr, (socklen_t)tt) != 0)
-    {
-        close(server);
-        perror(hostname);
 
+    if (connect(server, (struct sockaddr *)&addr, (socklen_t)tt) != 0) {
+        close(server);
+        perror(hostName);
+        fprintf(stdout, "cannot create COnnection to server\n");
         return -1;
     }
-    if (server != 0)
-        return -1;
-
 
     printf("connected TO server, establishing ssl handshake\n");
+
     ssl = SSL_new(ctx);
     
     SSL_set_fd(ssl, server);
