@@ -11,7 +11,96 @@
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
+#include <openssl/x509v3.h>
+typedef enum {
+        MatchFound,
+        MatchNotFound,
+        NoSANPresent,
+        MalformedCertificate,
+        Error
+} HostnameValidationResult;
+
 #define BUFSIZE 128
+
+static HostnameValidationResult matches_common_name(const char *hostname, const X509 *server_cert) {
+        int common_name_loc = -1;
+        X509_NAME_ENTRY *common_name_entry = NULL;
+        ASN1_STRING *common_name_asn1 = NULL;
+        char *common_name_str = NULL;
+
+        // Find the position of the CN field in the Subject field of the certificate
+        common_name_loc = X509_NAME_get_index_by_NID(X509_get_subject_name((X509 *) server_cert), NID_commonName, -1);
+        if (common_name_loc < 0) {
+                return Error;
+        }
+
+        // Extract the CN field
+        common_name_entry = X509_NAME_get_entry(X509_get_subject_name((X509 *) server_cert), common_name_loc);
+        if (common_name_entry == NULL) {
+                return Error;
+        }
+
+        // Convert the CN field to a C string
+        common_name_asn1 = X509_NAME_ENTRY_get_data(common_name_entry);
+        if (common_name_asn1 == NULL) {
+                return Error;
+        }
+        common_name_str = (char *) ASN1_STRING_get0_data(common_name_asn1);
+
+        // Make sure there isn't an embedded NUL character in the CN
+        if ((size_t)ASN1_STRING_length(common_name_asn1) != strlen(common_name_str)) {
+                return MalformedCertificate;
+        }
+
+        if( strcmp(hostname, common_name_str) == 0) {
+           return MatchFound;
+        }
+
+        return MatchNotFound;
+}
+
+
+static HostnameValidationResult matches_subject_alternative_name(const char *hostname, const X509 *server_cert) {
+        HostnameValidationResult result = MatchNotFound;
+        int i;
+        int san_names_nb = -1;
+        STACK_OF(GENERAL_NAME) *san_names = NULL;
+
+        // Try to extract the names within the SAN extension from the certificate
+        san_names = X509_get_ext_d2i((X509 *) server_cert, NID_subject_alt_name, NULL, NULL);
+        if (san_names == NULL) {
+                return NoSANPresent;
+        }
+        san_names_nb = sk_GENERAL_NAME_num(san_names);
+
+        // Check each name within the extension
+        for (i=0; i<san_names_nb; i++) {
+                const GENERAL_NAME *current_name = sk_GENERAL_NAME_value(san_names, i);
+
+                if (current_name->type == GEN_DNS) {
+                        // Current name is a DNS name, let's check it
+                        char *dns_name = (char *) ASN1_STRING_get0_data(current_name->d.dNSName);
+
+                        // Make sure there isn't an embedded NUL character in the DNS name
+                        if ((size_t)ASN1_STRING_length(current_name->d.dNSName) != strlen(dns_name)) {
+                                result = MalformedCertificate;
+                                break;
+                        }
+                        else { // Compare expected hostname with the DNS name
+                                if( strcmp(dns_name, hostname) == 0) {
+                                    return MatchFound;
+                                }
+                        }
+                }
+        }
+        sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+
+        return result;
+}
+
+
+
+
 int main(int argc, char*argv[]) {
     X509 *cert = NULL;
     const SSL_METHOD *method;
@@ -128,6 +217,16 @@ int main(int argc, char*argv[]) {
     cert = SSL_get_peer_certificate(ssl); /* get the server's certificate */
     if (cert != NULL)
     {
+        if(matches_common_name(hostName, cert) != MatchFound) {
+            if(!matches_subject_alternative_name(hostName, cert)) {
+                fprintf(stderr, "CN/SAN does not matches hostname\n");  
+                SSL_free(ssl);
+                close(server);
+                SSL_CTX_free(ctx);
+                return 1;  
+            }
+        }
+        fprintf(stdout, "CN and hostname matches\n");  
         printf("Server certificates:\n");
         line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
         printf("Subject: %s\n", line);
